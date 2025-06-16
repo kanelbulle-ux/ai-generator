@@ -19,10 +19,9 @@ app.post('/generate', async (req, res) => {
   try {
     const { prompt, brand_context, constraints } = req.body;
     
-    // For now, let's use OpenAI - add Anthropic later
-    const OpenAI = require('openai');
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
+    const Anthropic = require('@anthropic-ai/sdk');
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY
     });
 
     const systemPrompt = `You are a web developer creating HTML content for a website.
@@ -39,17 +38,17 @@ CONSTRAINTS:
 
 ${constraints || ''}`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 50000,
+      temperature: 0.7,
+      system: systemPrompt,
       messages: [
-        { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
-      ],
-      max_tokens: 2000,
-      temperature: 0.7
+      ]
     });
 
-    const generatedHtml = completion.choices[0].message.content;
+    const generatedHtml = completion.content[0].text;
 
     res.json({
       success: true,
@@ -72,30 +71,27 @@ app.post('/refine', async (req, res) => {
   try {
     const { current_html, refinement_request } = req.body;
     
-    const OpenAI = require('openai');
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
+    const Anthropic = require('@anthropic-ai/sdk');
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY
     });
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+    const completion = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 2000,
+      temperature: 0.7,
+      system: "You are refining HTML content. Keep the same structure but modify based on the user's request. Return only the updated HTML.",
       messages: [
-        { 
-          role: "system", 
-          content: "You are refining HTML content. Keep the same structure but modify based on the user's request. Return only the updated HTML." 
-        },
         { 
           role: "user", 
           content: `Current HTML:\n${current_html}\n\nPlease modify it to: ${refinement_request}` 
         }
-      ],
-      max_tokens: 2000,
-      temperature: 0.7
+      ]
     });
 
     res.json({
       success: true,
-      html: completion.choices[0].message.content,
+      html: completion.content[0].text,
       refinement: refinement_request,
       timestamp: new Date().toISOString()
     });
